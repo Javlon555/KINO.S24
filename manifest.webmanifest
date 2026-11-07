@@ -1,0 +1,9 @@
+{
+  "name": "KINO.S24 AI Movie Studio",
+  "short_name": "KINO.S24",
+  "description": "AI Automatic Movie Studio",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#090b10",
+  "theme_color": "#090b10"
+}
