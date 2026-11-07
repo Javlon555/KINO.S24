@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="uz">
 <head>
@@ -9,89 +8,47 @@
 <title>KINO.S24 AI Studio</title>
 <style>
 *{box-sizing:border-box}
-body{
- margin:0;padding:20px;
- background:#090b10;color:white;
- font-family:Arial,sans-serif;
-}
+body{margin:0;padding:20px;background:#090b10;color:white;font-family:Arial,sans-serif}
 header{text-align:center;padding:25px 0}
 h1{font-size:36px;letter-spacing:3px}
 h1 span{color:#e8b75b}
 header p{color:#aaa}
-.card{
- background:#151a25;padding:20px;
- border:1px solid #343b4b;
- border-radius:18px;margin-top:20px;
-}
+.card{background:#151a25;padding:20px;border:1px solid #343b4b;border-radius:18px;margin-top:20px}
 h2{font-size:20px}
 label{display:block;margin-top:17px;color:#ccc}
-input,select,textarea{
- width:100%;padding:14px;margin-top:8px;
- background:#090d15;color:white;
- border:1px solid #394354;
- border-radius:10px;font-size:16px;
-}
+select,textarea{width:100%;padding:14px;margin-top:8px;background:#090d15;color:white;border:1px solid #394354;border-radius:10px;font-size:16px}
 textarea{height:110px}
-button{
- width:100%;padding:16px;margin-top:20px;
- border:0;border-radius:12px;
- background:#e8b75b;color:#17120a;
- font-weight:bold;font-size:16px;
-}
+button{width:100%;padding:16px;margin-top:20px;border:0;border-radius:12px;background:#e8b75b;color:#17120a;font-weight:bold;font-size:16px}
+button:disabled{opacity:.6}
 #status{color:#e8b75b;margin-top:15px;line-height:1.5}
 .step{padding:12px;background:#0b1019;margin:8px 0;border-radius:9px}
-small{color:#999}
+#scriptResult{white-space:pre-wrap;line-height:1.6;overflow-wrap:anywhere}
 </style>
 </head>
 <body>
-
 <header>
 <h1>KINO<span>.</span>S24</h1>
 <p>AI AUTOMATIC MOVIE STUDIO</p>
 </header>
-
 <div class="card">
 <h2>🎬 Yangi kino yaratish</h2>
-
-<label for="topic">Kino mavzusi</label>
+<label>Kino mavzusi</label>
 <textarea id="topic" placeholder="Qanday kino yaratmoqchisiz?"></textarea>
-
-<label for="duration">Kino davomiyligi</label>
+<label>Kino davomiyligi</label>
 <select id="duration">
-<option>15 daqiqa</option>
-<option>30 daqiqa</option>
-<option>45 daqiqa</option>
-<option selected>60 daqiqa</option>
+<option>15 daqiqa</option><option>30 daqiqa</option><option>45 daqiqa</option><option selected>60 daqiqa</option>
 </select>
-
-<label for="genre">Kino janri</label>
+<label>Kino janri</label>
 <select id="genre">
-<option>Sarguzasht</option>
-<option>Jangari</option>
-<option>Dahshat</option>
-<option>Fantastika</option>
-<option>Tarixiy</option>
-<option>Drama</option>
+<option>Sarguzasht</option><option>Jangari</option><option>Dahshat</option><option>Fantastika</option><option>Tarixiy</option><option>Drama</option>
 </select>
-
-<label for="format">Video formati</label>
-<select id="format">
-<option>16:9 YouTube</option>
-<option>9:16 Shorts</option>
-</select>
-
-<label for="language">Kino tili</label>
-<select id="language">
-<option>O‘zbekcha</option>
-<option>Русский</option>
-<option>English</option>
-</select>
-
-<button onclick="createMovie()">KINONI BOSHLASH</button>
-
+<label>Video formati</label>
+<select id="format"><option>16:9 YouTube</option><option>9:16 Shorts</option></select>
+<label>Kino tili</label>
+<select id="language"><option>O‘zbekcha</option><option>Русский</option><option>English</option></select>
+<button id="startButton" onclick="createMovie()">KINONI BOSHLASH</button>
 <div id="status">Tizim tayyor. Kino mavzusini kiriting.</div>
 </div>
-
 <div class="card">
 <h2>⚙️ Avtomatik ishlab chiqarish</h2>
 <div class="step">01 — Ssenariy yaratish</div>
@@ -100,37 +57,54 @@ small{color:#999}
 <div class="step">04 — Ovoz va musiqa</div>
 <div class="step">05 — Montaj</div>
 <div class="step">06 — MP4 eksport</div>
-<small>AI video serveri keyingi bosqichda ulanadi.</small>
+<p>Hozir ssenariy yaratish funksiyasi ulanmoqda. Qolgan bosqichlar keyin ishlab chiqiladi.</p>
 </div>
-
+<div class="card" id="scriptCard" hidden>
+<h2>📝 AI yaratgan ssenariy</h2>
+<div id="scriptResult"></div>
+</div>
 <script>
-function createMovie(){
- const topic=document.getElementById('topic').value.trim();
- if(!topic){
-  alert('Avval kino mavzusini yozing!');
-  return;
- }
+const AI_SERVER_URL="https://kino-s24.gulumuz12345.workers.dev";
+async function createMovie(){
+ const topic=document.getElementById("topic").value.trim();
+ const status=document.getElementById("status");
+ const button=document.getElementById("startButton");
+ if(!topic){alert("Avval kino mavzusini yozing!");return;}
  const project={
-  topic:topic,
-  duration:document.getElementById('duration').value,
-  genre:document.getElementById('genre').value,
-  format:document.getElementById('format').value,
-  language:document.getElementById('language').value
+  topic,
+  duration:document.getElementById("duration").value,
+  genre:document.getElementById("genre").value,
+  format:document.getElementById("format").value,
+  language:document.getElementById("language").value
  };
- try {
-  localStorage.setItem('kinoS24Project',JSON.stringify(project));
-  document.getElementById('status').innerText=
-   'Loyiha saqlandi. Keyingi bosqich: AI serverini ulash.';
- } catch(error) {
-  document.getElementById('status').innerText=
-   'Loyihani saqlab bo‘lmadi. Brauzer sozlamalarini tekshiring.';
+ try{localStorage.setItem("kinoS24Project",JSON.stringify(project));}
+ catch(e){status.innerText="Saqlash xatosi: "+e.message;return;}
+ button.disabled=true;
+ button.innerText="AI SSENARIY YOZMOQDA...";
+ status.innerText="Gemini AI serveriga ulanmoqda. Kuting...";
+ document.getElementById("scriptCard").hidden=true;
+ try{
+  const response=await fetch(AI_SERVER_URL,{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify(project)
+  });
+  const result=await response.json();
+  if(!response.ok)throw new Error(result.error||"Server xatosi: "+response.status);
+  if(!result.script)throw new Error("AI ssenariy qaytarmadi.");
+  document.getElementById("scriptResult").textContent=result.script;
+  document.getElementById("scriptCard").hidden=false;
+  status.innerText="Muvaffaqiyatli! Gemini ssenariy yaratdi.";
+ }catch(e){
+  status.innerText="Ulanish xatosi: "+e.message;
+ }finally{
+  button.disabled=false;
+  button.innerText="KINONI BOSHLASH";
  }
 }
-if('serviceWorker' in navigator &&
-   location.protocol.startsWith('http')){
- navigator.serviceWorker.register('./sw.js').catch(console.error);
+if("serviceWorker" in navigator && location.protocol.startsWith("http")){
+ navigator.serviceWorker.register("./sw.js").catch(console.error);
 }
 </script>
-
 </body>
 </html>
