@@ -1,10 +1,8 @@
-
-const MODEL = "gemini-2.5-flash";
+const MODEL = "gemini-3.8-flash";
 
 export default {
   async fetch(request, env) {
     const allowedOrigin = "https://javlon555.github.io";
-    const origin = request.headers.get("Origin");
 
     const headers = {
       "Access-Control-Allow-Origin": allowedOrigin,
@@ -14,14 +12,7 @@ export default {
     };
 
     if (request.method === "OPTIONS") {
-      return new Response(null, { headers });
-    }
-
-    if (origin && origin !== allowedOrigin) {
-      return new Response(
-        JSON.stringify({ error: "Ruxsat berilmagan manba" }),
-        { status: 403, headers }
-      );
+      return new Response(null, { status: 204, headers });
     }
 
     if (request.method !== "POST") {
@@ -31,9 +22,16 @@ export default {
       );
     }
 
+    if (request.headers.get("Origin") !== allowedOrigin) {
+      return new Response(
+        JSON.stringify({ error: "Ruxsat berilmagan manba" }),
+        { status: 403, headers }
+      );
+    }
+
     if (!env.GEMINI_API_KEY) {
       return new Response(
-        JSON.stringify({ error: "Gemini API kaliti sozlanmagan" }),
+        JSON.stringify({ error: "Gemini API kaliti topilmadi" }),
         { status: 500, headers }
       );
     }
@@ -51,30 +49,30 @@ export default {
 
       const prompt = `
 Sen professional kino ssenariynavchisisan.
-KINO.S24 uchun original kino ssenariysi yarat.
+KINO.S24 uchun original va batafsil kino ssenariysi yoz.
 
 MAVZU: ${topic}
 DAVOMIYLIGI: ${duration || "15 daqiqa"}
 JANR: ${genre || "Drama"}
-TIL: ${language || "O'zbekcha"}
+TIL: ${language || "O‘zbekcha"}
 FORMAT: ${format || "16:9"}
 
 Quyidagilarni tayyorla:
-1. Kino nomi.
-2. Qisqacha mazmuni.
-3. Asosiy aktyorlar va ularning tavsifi.
-4. Voqealar ketma-ketligi.
-5. Raqamlangan sahnalar.
-6. Har bir sahnada joy, vaqt, harakat va kamera tasviri.
-7. Aktyorlarning tabiiy dialoglari.
+1. Kino nomi va mazmuni.
+2. Asosiy aktyorlar va tashqi ko‘rinishi.
+3. Voqealar ketma-ketligi.
+4. Raqamlangan sahnalar.
+5. Har bir sahnaning joyi, vaqti va tasviri.
+6. Kamera harakati va aktyorlar harakati.
+7. Tabiiy dialoglar.
 8. Kuchli yakun.
 
-Ssenariyni kino ishlab chiqarishga mos, batafsil yoz.
-Hozirgi javobga sig'adigan darajada ko'p sahna yarat.
+Ssenariyni kino ishlab chiqarishga mos yoz.
 `;
 
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
+        "https://generativelanguage.googleapis.com/v1beta/models/" +
+          MODEL + ":generateContent",
         {
           method: "POST",
           headers: {
@@ -86,7 +84,6 @@ Hozirgi javobga sig'adigan darajada ko'p sahna yarat.
               parts: [{ text: prompt }]
             }],
             generationConfig: {
-              temperature: 0.8,
               maxOutputTokens: 8192
             }
           })
@@ -98,16 +95,23 @@ Hozirgi javobga sig'adigan darajada ko'p sahna yarat.
       if (!response.ok) {
         return new Response(
           JSON.stringify({
-            error: result.error?.message || "Gemini xatosi"
+            error: result.error?.message || "Gemini API xatosi",
+            code: result.error?.code || response.status
           }),
           { status: response.status, headers }
         );
       }
 
-      const script =
-        result.candidates?.[0]?.content?.parts
-          ?.map(part => part.text || "")
-          .join("\n") || "";
+      const script = result.candidates?.[0]?.content?.parts
+        ?.map(part => part.text || "")
+        .join("\n") || "";
+
+      if (!script) {
+        return new Response(
+          JSON.stringify({ error: "Gemini bo‘sh javob qaytardi" }),
+          { status: 502, headers }
+        );
+      }
 
       return new Response(
         JSON.stringify({
