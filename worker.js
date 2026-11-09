@@ -1,78 +1,97 @@
 const MODEL = "gemini-3.8-flash";
+const ALLOWED_ORIGIN = "https://javlon555.github.io";
+
+function reply(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Max-Age": "86400",
+      "Cache-Control": "no-store",
+      "Vary": "Origin"
+    }
+  });
+}
 
 export default {
   async fetch(request, env) {
-    const allowedOrigin = "https://javlon555.github.io";
-
-    const headers = {
-      "Access-Control-Allow-Origin": allowedOrigin,
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-      "Content-Type": "application/json; charset=utf-8"
-    };
+    const origin = request.headers.get("Origin") || "";
 
     if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers });
+      if (origin !== ALLOWED_ORIGIN) {
+        return new Response(null, { status: 403 });
+      }
+
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type",
+          "Access-Control-Max-Age": "86400",
+          "Vary": "Origin"
+        }
+      });
+    }
+
+    if (request.method === "GET") {
+      return reply({
+        success: true,
+        message: "KINO.S24 server ishlayapti",
+        model: MODEL,
+        apiKeyExists: Boolean(env.GEMINI_API_KEY)
+      });
     }
 
     if (request.method !== "POST") {
-      return new Response(
-        JSON.stringify({ message: "KINO.S24 AI server ishlayapti" }),
-        { headers }
-      );
+      return reply({ error: "POST so‘rovi kerak" }, 405);
     }
 
-    if (request.headers.get("Origin") !== allowedOrigin) {
-      return new Response(
-        JSON.stringify({ error: "Ruxsat berilmagan manba" }),
-        { status: 403, headers }
-      );
+    if (origin !== ALLOWED_ORIGIN) {
+      return reply({ error: "Sayt manzili ruxsat etilmagan" }, 403);
     }
 
     if (!env.GEMINI_API_KEY) {
-      return new Response(
-        JSON.stringify({ error: "Gemini API kaliti topilmadi" }),
-        { status: 500, headers }
-      );
+      return reply({ error: "GEMINI_API_KEY topilmadi" }, 500);
     }
 
     try {
       const data = await request.json();
-      const { topic, duration, genre, language, format } = data;
+      const topic = String(data.topic || "").trim();
 
-      if (!topic || !String(topic).trim()) {
-        return new Response(
-          JSON.stringify({ error: "Kino mavzusini kiriting" }),
-          { status: 400, headers }
-        );
+      if (!topic) {
+        return reply({ error: "Kino mavzusini kiriting" }, 400);
       }
 
       const prompt = `
 Sen professional kino ssenariynavchisisan.
-KINO.S24 uchun original va batafsil kino ssenariysi yoz.
+KINO.S24 uchun original kino ssenariysi yoz.
 
 MAVZU: ${topic}
-DAVOMIYLIGI: ${duration || "15 daqiqa"}
-JANR: ${genre || "Drama"}
-TIL: ${language || "O‘zbekcha"}
-FORMAT: ${format || "16:9"}
+DAVOMIYLIGI: ${data.duration || "15 daqiqa"}
+JANR: ${data.genre || "Drama"}
+TIL: ${data.language || "O‘zbekcha"}
+FORMAT: ${data.format || "16:9"}
 
 Quyidagilarni tayyorla:
 1. Kino nomi va mazmuni.
-2. Asosiy aktyorlar va tashqi ko‘rinishi.
+2. Asosiy qahramonlar va tashqi ko‘rinishi.
 3. Voqealar ketma-ketligi.
 4. Raqamlangan sahnalar.
 5. Har bir sahnaning joyi, vaqti va tasviri.
-6. Kamera harakati va aktyorlar harakati.
+6. Kamera va aktyorlar harakati.
 7. Tabiiy dialoglar.
 8. Kuchli yakun.
 
-Ssenariyni kino ishlab chiqarishga mos yoz.
+Ssenariy izchil, batafsil va kino ishlab chiqarishga mos bo‘lsin.
 `;
 
       const response = await fetch(
         "https://generativelanguage.googleapis.com/v1beta/models/" +
-          MODEL + ":generateContent",
+        MODEL + ":generateContent",
         {
           method: "POST",
           headers: {
@@ -81,6 +100,7 @@ Ssenariyni kino ishlab chiqarishga mos yoz.
           },
           body: JSON.stringify({
             contents: [{
+              role: "user",
               parts: [{ text: prompt }]
             }],
             generationConfig: {
@@ -90,43 +110,47 @@ Ssenariyni kino ishlab chiqarishga mos yoz.
         }
       );
 
-      const result = await response.json();
+      const raw = await response.text();
+      let result;
+
+      try {
+        result = JSON.parse(raw);
+      } catch {
+        return reply({
+          error: "Gemini noto‘g‘ri javob qaytardi",
+          status: response.status
+        }, 502);
+      }
 
       if (!response.ok) {
-        return new Response(
-          JSON.stringify({
-            error: result.error?.message || "Gemini API xatosi",
-            code: result.error?.code || response.status
-          }),
-          { status: response.status, headers }
-        );
+        return reply({
+          error: result.error?.message || "Gemini API xatosi",
+          status: response.status
+        }, 502);
       }
 
-      const script = result.candidates?.[0]?.content?.parts
-        ?.map(part => part.text || "")
-        .join("\n") || "";
+      const script = (result.candidates?.[0]?.content?.parts || [])
+        .map(part => part.text || "")
+        .join("\n")
+        .trim();
 
       if (!script) {
-        return new Response(
-          JSON.stringify({ error: "Gemini bo‘sh javob qaytardi" }),
-          { status: 502, headers }
-        );
+        return reply({
+          error: "Gemini bo‘sh javob qaytardi"
+        }, 502);
       }
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          model: MODEL,
-          script
-        }),
-        { headers }
-      );
+      return reply({
+        success: true,
+        model: MODEL,
+        script
+      });
 
     } catch (error) {
-      return new Response(
-        JSON.stringify({ error: "Server xatosi: " + error.message }),
-        { status: 500, headers }
-      );
+      return reply({
+        error: "Server xatosi",
+        details: error.message
+      }, 500);
     }
   }
 };
